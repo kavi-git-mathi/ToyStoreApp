@@ -1,38 +1,50 @@
 pipeline {
     agent any
     
+    options {
+        // Keep only last 3 builds to save space
+        buildDiscarder(logRotator(numToKeepStr: '3'))
+        
+        // Timeout after 30 minutes
+        timeout(time: 30, unit: 'MINUTES')
+        
+        // Skip default checkout (we'll do it manually)
+        skipDefaultCheckout()
+    }
+    
     environment {
         APP_NAME = 'toystoreapp'
         ACR_REGISTRY = 'kavitharc.azurecr.io'
         DOCKER_IMAGE = "${ACR_REGISTRY}/${APP_NAME}:${BUILD_NUMBER}"
     }
     
-    options {
-        // Automatically clean workspace before build
-        cleanWs(before: true, deleteDirs: true)
-        
-        // Only keep last 5 builds to save space
-        buildDiscarder(logRotator(numToKeepStr: '5', artifactNumToKeepStr: '5'))
-        
-        // Timeout after 30 minutes
-        timeout(time: 30, unit: 'MINUTES')
-    }
-    
     stages {
-        // STAGE 1: Git Checkout
-        stage('Git Checkout') {
+        // STAGE 1: Clean Workspace & Git Checkout
+        stage('Clean & Checkout') {
             steps {
-                echo "✅ Stage 1: Checking out code..."
+                echo "🧹 Stage 1: Cleaning workspace..."
+                
+                script {
+                    // Manual cleanup before checkout
+                    sh '''
+                        echo "Cleaning workspace..."
+                        # Remove everything except hidden Jenkins files
+                        find . -maxdepth 1 ! -name '.' ! -name '..' ! -name '*.jenkins*' -exec rm -rf {} + 2>/dev/null || true
+                        
+                        echo "Workspace cleaned. Current contents:"
+                        ls -la
+                    '''
+                }
+                
+                echo "📥 Checking out code..."
                 checkout([
                     $class: 'GitSCM',
                     branches: [[name: '*/main']],
                     extensions: [
-                        // Clean workspace before checkout
+                        // Clean before checkout
                         [$class: 'CleanBeforeCheckout'],
                         // Shallow clone to save space
-                        [$class: 'CloneOption', depth: 1, shallow: true],
-                        // Prune stale branches
-                        [$class: 'PruneStaleBranch']
+                        [$class: 'CloneOption', depth: 1, shallow: true]
                     ],
                     userRemoteConfigs: [[
                         url: 'https://github.com/kavi-git-mathi/Toystoreapp.git'
@@ -40,7 +52,8 @@ pipeline {
                 ])
                 
                 sh '''
-                    echo "Workspace size after checkout:"
+                    echo "✅ Checkout completed"
+                    echo "Workspace size:"
                     du -sh . || true
                 '''
             }
@@ -51,14 +64,15 @@ pipeline {
             steps {
                 echo "🔨 Stage 2: Building application..."
                 sh '''
-                    # Clean obj/bin directories first
-                    rm -rf bin/ obj/ || true
+                    # Clean any previous build artifacts
+                    rm -rf bin/ obj/ 2>/dev/null || true
                     
                     dotnet restore --verbosity minimal
                     dotnet build --configuration Release --no-restore --verbosity minimal
                     
+                    echo "Build completed"
                     echo "Build output size:"
-                    du -sh bin/ || true
+                    du -sh bin/ 2>/dev/null || true
                 '''
             }
         }
@@ -68,7 +82,8 @@ pipeline {
             steps {
                 echo "🧪 Stage 3: Running tests..."
                 sh '''
-                    dotnet test --configuration Release --no-build --verbosity minimal --logger "console;verbosity=minimal"
+                    dotnet test --configuration Release --no-build --verbosity minimal
+                    echo "✅ Tests completed"
                 '''
             }
         }
@@ -77,37 +92,22 @@ pipeline {
         stage('Security Scan') {
             steps {
                 echo "🛡️ Stage 4: Security scanning..."
-                script {
-                    // Check disk space before scan
-                    sh '''
-                        echo "=== Disk Space Before Scan ==="
-                        df -h .
-                        echo "=== Workspace Size ==="
-                        du -sh . || true
-                    '''
+                sh '''
+                    # Create temp directory for Trivy
+                    TRIVY_TEMP="${WORKSPACE}/.trivy-temp"
+                    mkdir -p ${TRIVY_TEMP}
                     
-                    // Install Trivy to temp directory
-                    sh '''
-                        TRIVY_DIR="${WORKSPACE}/.temp/trivy"
-                        mkdir -p ${TRIVY_DIR}
-                        
-                        echo "Installing Trivy..."
-                        curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b ${TRIVY_DIR}
-                        
-                        echo "Running security scan..."
-                        ${TRIVY_DIR}/trivy fs --severity HIGH,CRITICAL --exit-code 0 --quiet .
-                    '''
-                }
-            }
-            
-            post {
-                always {
-                    // Clean Trivy temp files
-                    sh '''
-                        echo "Cleaning Trivy temp files..."
-                        rm -rf ${WORKSPACE}/.temp || true
-                    '''
-                }
+                    echo "Installing Trivy..."
+                    curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b ${TRIVY_TEMP}
+                    
+                    echo "Running security scan..."
+                    ${TRIVY_TEMP}/trivy fs --severity HIGH,CRITICAL --exit-code 0 --quiet .
+                    
+                    echo "✅ Security scan completed"
+                    
+                    # Clean Trivy temp files
+                    rm -rf ${TRIVY_TEMP}
+                '''
             }
         }
         
@@ -115,29 +115,20 @@ pipeline {
         stage('Docker Build') {
             steps {
                 echo "🐳 Stage 5: Building Docker image..."
-                script {
-                    // Clean Docker cache before build
-                    sh '''
-                        echo "=== Docker Disk Usage Before ==="
-                        docker system df || true
-                        
-                        echo "Cleaning unused Docker images..."
-                        docker image prune -f || true
-                    '''
+                sh '''
+                    echo "Cleaning Docker cache before build..."
+                    docker image prune -f 2>/dev/null || true
                     
-                    // Build Docker image
-                    sh '''
-                        docker build \
-                          --tag ${DOCKER_IMAGE} \
-                          --tag ${ACR_REGISTRY}/${APP_NAME}:latest \
-                          --label "build=${BUILD_NUMBER}" \
-                          --label "commit=${GIT_COMMIT}" \
-                          .
-                        
-                        echo "Docker images created:"
-                        docker images --filter "reference=*${APP_NAME}*" --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
-                    '''
-                }
+                    echo "Building Docker image..."
+                    docker build \
+                      --tag ${DOCKER_IMAGE} \
+                      --tag ${ACR_REGISTRY}/${APP_NAME}:latest \
+                      .
+                    
+                    echo "✅ Docker image built"
+                    echo "Images created:"
+                    docker images --filter "reference=*${APP_NAME}*" --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}" 2>/dev/null || true
+                '''
             }
         }
         
@@ -159,20 +150,9 @@ pipeline {
                         docker push ${DOCKER_IMAGE}
                         docker push ${ACR_REGISTRY}/${APP_NAME}:latest
                         
-                        echo "✅ Images pushed:"
+                        echo "✅ Images pushed to ACR"
                         echo "- ${DOCKER_IMAGE}"
                         echo "- ${ACR_REGISTRY}/${APP_NAME}:latest"
-                    '''
-                }
-            }
-            
-            post {
-                success {
-                    // Remove pushed images to save space
-                    sh '''
-                        echo "Cleaning up Docker images after push..."
-                        docker rmi ${DOCKER_IMAGE} ${ACR_REGISTRY}/${APP_NAME}:latest || true
-                        docker image prune -f
                     '''
                 }
             }
@@ -181,34 +161,26 @@ pipeline {
     
     post {
         always {
-            echo "📦 Final cleanup..."
+            echo "🧹 Performing final cleanup..."
             
             script {
                 // Comprehensive cleanup
                 sh '''
-                    echo "=== Cleaning Workspace ==="
+                    echo "=== CLEANING WORKSPACE ==="
                     # Remove build artifacts
-                    rm -rf bin/ obj/ TestResults/ .temp/ || true
+                    rm -rf bin/ obj/ TestResults/ .trivy-temp/ 2>/dev/null || true
                     
-                    # Remove Docker build cache
-                    docker builder prune -f || true
+                    # Clean Docker
+                    echo "Cleaning Docker..."
+                    docker rmi ${DOCKER_IMAGE} ${ACR_REGISTRY}/${APP_NAME}:latest 2>/dev/null || true
+                    docker image prune -f 2>/dev/null || true
+                    docker builder prune -f 2>/dev/null || true
                     
-                    # Clean Docker images
-                    docker image prune -f || true
-                    
-                    echo "=== Final Disk Usage ==="
-                    df -h .
+                    echo "=== FINAL DISK USAGE ==="
                     echo "Workspace size:"
-                    du -sh . || true
+                    du -sh . 2>/dev/null || echo "Cannot check workspace size"
                     echo "Docker disk usage:"
-                    docker system df || true
-                '''
-                
-                // Send disk usage notification
-                sh '''
-                    echo "Build #${BUILD_NUMBER} completed with cleanup"
-                    echo "Workspace: $(du -sh . | cut -f1)"
-                    echo "Docker: $(docker system df --format "{{.TotalSpace}} used: {{.Active}}")"
+                    docker system df 2>/dev/null || echo "Cannot check Docker disk usage"
                 '''
             }
         }
@@ -218,7 +190,7 @@ pipeline {
         }
         
         failure {
-            echo "❌ Pipeline failed - cleanup still performed"
+            echo "❌ Pipeline failed - cleanup performed"
         }
     }
 }
