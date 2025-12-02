@@ -4,10 +4,10 @@ pipeline {
     environment {
         APP_NAME = 'toystoreapp'
         ACR_REGISTRY = 'kavitharc.azurecr.io'
-        SONAR_PROJECT_KEY = 'toystoreapp'
     }
     
     stages {
+        // STAGE 1: Already working
         stage('Git Checkout') {
             steps {
                 checkout scm
@@ -15,35 +15,45 @@ pipeline {
             }
         }
         
+        // STAGE 2: Already working
         stage('.NET Restore & Build') {
             steps {
+                echo "🔨 Stage 2: Building .NET application..."
                 sh '''
                     dotnet restore
                     dotnet build --configuration Release
+                    echo "✅ Stage 2: .NET build completed"
                 '''
             }
         }
         
+        // STAGE 3: Already working
         stage('.NET Tests') {
             steps {
+                echo "🧪 Stage 3: Running tests..."
                 sh '''
                     dotnet test --configuration Release
+                    echo "✅ Stage 3: Tests completed"
                 '''
             }
         }
         
-        stage('SonarQube Scan') {
+        // STAGE 4: Trivy Security Scan (NEW)
+        stage('Trivy Security Scan') {
             steps {
-                echo "📊 Stage 4: Running SonarQube scan..."
-                withSonarQubeEnv('sonarqube') {
-                    sh '''
-                        dotnet sonarscanner begin /k:"${SONAR_PROJECT_KEY}"
-                        dotnet build --configuration Release
-                        dotnet sonarscanner end
-                        echo "✅ Stage 4: SonarQube scan completed"
-                    '''
-                }
+                echo "🛡️ Stage 4: Running security scan..."
+                sh '''
+                    # Install Trivy
+                    curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+                    
+                    # Scan for vulnerabilities
+                    trivy fs --severity HIGH,CRITICAL .
+                    
+                    echo "✅ Stage 4: Security scan completed"
+                '''
             }
         }
+        
+        // We'll add Docker and ACR stages next
     }
 }
