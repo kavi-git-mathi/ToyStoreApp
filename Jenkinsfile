@@ -5,7 +5,7 @@ pipeline {
         APP_NAME = 'toystoreapp'
         ACR_REGISTRY = 'kavitharc.azurecr.io'
         DOCKER_IMAGE = "${ACR_REGISTRY}/${APP_NAME}:${BUILD_NUMBER}"
-        SONAR_PROJECT_KEY = 'toystoreapp'
+        SONAR_PROJECT_KEY = 'Toystore-Project'
     }
     
     stages {
