@@ -40,20 +40,23 @@ pipeline {
         
         // STAGE 4: Trivy Security Scan (NEW)
         stage('Trivy Security Scan') {
-            steps {
-                echo "🛡️ Stage 4: Running security scan..."
-                sh '''
-                    # Install Trivy
-                    curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-                    
-                    # Scan for vulnerabilities
-                    trivy fs --severity HIGH,CRITICAL .
-                    
-                    echo "✅ Stage 4: Security scan completed"
-                '''
-            }
-        }
-        
-        // We'll add Docker and ACR stages next
+    steps {
+        echo "🛡️ Stage 4: Running security scan..."
+        sh '''
+            echo "Installing Trivy to workspace..."
+            # Install to workspace directory (no sudo needed)
+            curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b ${WORKSPACE}/.trivy
+            
+            echo "Adding to PATH..."
+            export PATH=${WORKSPACE}/.trivy:$PATH
+            
+            echo "Checking Trivy installation..."
+            ${WORKSPACE}/.trivy/trivy --version
+            
+            echo "Scanning for vulnerabilities..."
+            ${WORKSPACE}/.trivy/trivy fs --severity HIGH,CRITICAL --exit-code 0 .
+            
+            echo "✅ Stage 4: Security scan completed"
+        '''
     }
 }
