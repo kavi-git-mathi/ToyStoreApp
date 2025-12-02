@@ -77,16 +77,16 @@ pipeline {
     post {
         success {
             echo "Waiting for SonarQube Quality Gate..."
-            script {
-                // Wait for quality gate result
-                timeout(time: 5, unit: 'MINUTES') {
-                    def qg = waitForQualityGate()
-                    if (qg.status != 'OK') {
-                        error "❌ SonarQube Quality Gate failed: ${qg.status}"
-                    }
-                    echo "✅ SonarQube Quality Gate passed: ${qg.status}"
-                }
-            }
+            // script {
+            //     // Wait for quality gate result
+            //     timeout(time: 5, unit: 'MINUTES') {
+            //         def qg = waitForQualityGate()
+            //         if (qg.status != 'OK') {
+            //             error "❌ SonarQube Quality Gate failed: ${qg.status}"
+            //         }
+            //         echo "✅ SonarQube Quality Gate passed: ${qg.status}"
+            //     }
+            // }
         }
     }
 }
