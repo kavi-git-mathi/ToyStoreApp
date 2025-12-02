@@ -13,6 +13,8 @@ spec:
       labels:
         app: toystoreapp
     spec:
+      imagePullSecrets:
+      - name: acr-secret
       containers:
       - name: toystoreapp
         image: kavitharc.azurecr.io/toystoreapp:latest
