@@ -123,7 +123,7 @@ stage('Docker Build') {
             sleep 10
             
             # Verify it's working
-            if curl -f http://localhost:8000 > /dev/null 2>&1; then
+            if curl -f http://4.206.208.71:8000 > /dev/null 2>&1; then
                 echo "✅ Application is running on port 8000"
                 docker stop smoke-test
                 docker rm smoke-test
