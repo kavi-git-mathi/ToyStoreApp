@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: toystoreapp
+  namespace: toystore
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: toystoreapp
+  template:
+    metadata:
+      labels:
+        app: toystoreapp
+    spec:
+      imagePullSecrets:
+      - name: acr-secret
+      containers:
+      - name: toystoreapp
+        image: kavitharc.azurecr.io/toystoreapp:latest
+        ports:
+        - containerPort: 8000

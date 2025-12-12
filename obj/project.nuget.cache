@@ -4,5 +4,12 @@
   "success": true,
   "projectFilePath": "M:\\BootCamp\\Project1\\ToyStoreApp\\ToyStoreApp.csproj",
   "expectedPackageFiles": [],
-  "logs": []
+  "logs": [
+    {
+      "code": "Undefined",
+      "level": "Warning",
+      "warningLevel": 1,
+      "message": "Problem reading the cache file M:\\BootCamp\\Project1\\ToyStoreApp\\obj\\project.nuget.cache : Invalid property identifier character: <. Path 'version', line 3, position 0."
+    }
+  ]
 }

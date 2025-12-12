@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: toystoreapp-service
+  namespace: toystore
+spec:
+  selector:
+    app: toystoreapp
+  ports:
+  - port: 8000
+    targetPort: 8000
+  type: LoadBalancer

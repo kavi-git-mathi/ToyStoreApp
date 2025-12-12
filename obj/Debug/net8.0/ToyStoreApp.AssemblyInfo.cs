@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ToyStoreApp")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b4cc0654143f42286d49d313976a5dc545d735ed")]
 [assembly: System.Reflection.AssemblyProductAttribute("ToyStoreApp")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ToyStoreApp")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
